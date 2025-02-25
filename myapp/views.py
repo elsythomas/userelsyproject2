@@ -28,7 +28,7 @@ from django.template.loader import render_to_string
 from django.core.mail import EmailMultiAlternatives
 from django.conf import settings
 from itsdangerous import URLSafeTimedSerializer
-from .models import Profile, User  # Assuming Role model exists
+from .models import Profile, Role, User  # Assuming Role model exists
 
 # Initialize serializer for email verification token
 serializer = URLSafeTimedSerializer(settings.SECRET_KEY)
@@ -95,7 +95,7 @@ from django.template.loader import render_to_string
 from django.core.mail import EmailMultiAlternatives
 
 class SignupView(APIView):
-    permission_classes = [IsAdminOrTeacher]
+    permission_classes = []
 
     def post(self, request):
         name = request.data.get("name")
@@ -386,7 +386,7 @@ def user_list(request, user_id=None):
 #ROLE CREATION CRUD
 # Role CRUD API
 @api_view(['POST', 'GET', 'PUT', 'DELETE'])
-@permission_classes([IsAdminUser])
+@permission_classes([])
 def role_crud(request, role_id=None):
     if request.method == 'POST':
         name = request.data.get('name')
@@ -429,59 +429,131 @@ def role_crud(request, role_id=None):
 
 
 
-
-
 from django.contrib.auth.models import User
 from django.utils.crypto import get_random_string
-from django.core.mail import send_mail
-from django.shortcuts import get_object_or_404
+from django.core.mail import send_mail, EmailMultiAlternatives
+from django.core.cache import cache
+from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import AllowAny
-from django.core.cache import cache  # Using cache to store tokens temporarily
 
-# Endpoint to request a password reset
 class RequestPasswordReset(APIView):
     permission_classes = []
 
     def post(self, request):
         email = request.POST.get('email')
         user = User.objects.filter(email=email).first()
+
         if user:
             token = get_random_string(32)
             cache.set(token, user.id, timeout=3600)  # Store token for 1 hour
-            send_mail(
-                'Password Reset Request',
-                f'Use this token to reset your password: {token}',
-                'no-reply@example.com',
-                [email],
-                fail_silently=False,
-            )
-            return Response({'message': 'Reset token sent to email'}, status=status.HTTP_200_OK)
+
+            reset_link = f"{settings.FRONTEND_URL}/reset-password/{token}/"
+
+            subject = "Password Reset Request"
+            from_email = "no-reply@example.com"
+            to_email = [email]
+
+            # Plain text fallback
+            text_content = f"Click the link to reset your password: {reset_link}"
+
+            # HTML Email with a button
+            html_content = f"""
+            <html>
+            <body>
+                <p>Hello,</p>
+                <p>Click the button below to reset your password:</p>
+                <a href="{reset_link}" style="
+                    display: inline-block;
+                    background-color: #007bff;
+                    color: white;
+                    padding: 10px 20px;
+                    text-decoration: none;
+                    font-size: 16px;
+                    border-radius: 5px;
+                ">Reset Password</a>
+                <p>If you didn’t request this, you can ignore this email.</p>
+            </body>
+            </html>
+            """
+
+            email_message = EmailMultiAlternatives(subject, text_content, from_email, to_email)
+            email_message.attach_alternative(html_content, "text/html")
+            email_message.send()
+
+            return Response({'message': 'Password reset link sent to email'}, status=status.HTTP_200_OK)
+
         return Response({'error': 'Email not found'}, status=status.HTTP_400_BAD_REQUEST)
 
+
+# from django.contrib.auth.models import User
+# from django.utils.crypto import get_random_string
+# from django.core.mail import send_mail
+# from django.shortcuts import get_object_or_404
+# from rest_framework.views import APIView
+# from rest_framework.response import Response
+# from rest_framework import status
+# from rest_framework.permissions import AllowAny
+# from django.core.cache import cache  # Using cache to store tokens temporarily
+
+# # Endpoint to request a password reset
+# class RequestPasswordReset(APIView):
+#     permission_classes = []
+
+#     def post(self, request):
+#         email = request.POST.get('email')
+#         user = User.objects.filter(email=email).first()
+#         if user:
+#             token = get_random_string(32)
+#             cache.set(token, user.id, timeout=3600)  # Store token for 1 hour
+#             send_mail(
+#                 'Password Reset Request',
+#                 f'Use this token to reset your password: {token}',
+#                 'no-reply@example.com',
+#                 [email],
+#                 fail_silently=False,
+#             )
+#             return Response({'message': 'Reset token sent to email'}, status=status.HTTP_200_OK)
+#         return Response({'error': 'Email not found'}, status=status.HTTP_400_BAD_REQUEST)
+
 # Endpoint to reset password
+# class ResetPassword(APIView):
+#     permission_classes = []
+
+#     def post(self, request):
+#         token = request.POST.get('token')
+#         new_password = request.POST.get('new_password')
+#         confirm_password = request.POST.get('confirm_password')
+
+#         if new_password != confirm_password:
+#             return Response({'error': 'Passwords do not match'}, status=status.HTTP_400_BAD_REQUEST)
+        
+#         user_id = cache.get(token)
+#         if user_id:
+#             user = get_object_or_404(User, id=user_id)
+#             user.set_password(new_password)
+#             user.save()
+#             cache.delete(token)  # Remove token after use
+#             return Response({'message': 'Password reset successful'}, status=status.HTTP_200_OK)
+        
+#         return Response({'error': 'Invalid or expired token'}, status=status.HTTP_400_BAD_REQUEST)
+
 class ResetPassword(APIView):
     permission_classes = []
 
     def post(self, request):
-        token = request.POST.get('token')
+        user_id = request.POST.get('user_id')
         new_password = request.POST.get('new_password')
         confirm_password = request.POST.get('confirm_password')
 
         if new_password != confirm_password:
             return Response({'error': 'Passwords do not match'}, status=status.HTTP_400_BAD_REQUEST)
         
-        user_id = cache.get(token)
-        if user_id:
-            user = get_object_or_404(User, id=user_id)
-            user.set_password(new_password)
-            user.save()
-            cache.delete(token)  # Remove token after use
-            return Response({'message': 'Password reset successful'}, status=status.HTTP_200_OK)
-        
-        return Response({'error': 'Invalid or expired token'}, status=status.HTTP_400_BAD_REQUEST)
+        user = get_object_or_404(User, id=user_id)
+        user.set_password(new_password)
+        user.save()
 
+        return Response({'message': 'Password reset successful'}, status=status.HTTP_200_OK)
 
 

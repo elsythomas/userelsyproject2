@@ -12,17 +12,41 @@
 #         if request.user.Role_id in [1, 2]:
 #             return True
 #         return False
+# from rest_framework import permissions
+# from myapp.models import User
+# class IsAdminOrTeacher(permissions.BasePermission):
+#     """
+#     Allows access only to authenticated users with the ADMIN or TEACHER role.
+#     """
+
+#     def has_permission(self, request, view):
+#         return request.user.is_authenticated and request.user.role in [Role.ADMIN, Role.TEACHER]
+
+# # from rest_framework import permissions
+
+# class IsAdminUser(permissions.BasePermission):
+#     """
+#     Allows access only to authenticated users with the ADMIN role.
+#     """
+
+#     def has_permission(self, request, view):
+#         return request.user.is_authenticated and request.user.Role_id == 1
+
 from rest_framework import permissions
-from myapp.models import User
+from myapp.models import Role
+
 class IsAdminOrTeacher(permissions.BasePermission):
     """
     Allows access only to authenticated users with the ADMIN or TEACHER role.
     """
 
     def has_permission(self, request, view):
-        return request.user.is_authenticated and request.user.role in [Role.ADMIN, Role.TEACHER]
+        return (
+            request.user.is_authenticated
+            and request.user.role  # Ensure role is assigned
+            and request.user.role.name in [Role.ADMIN, Role.TEACHER]
+        )
 
-# from rest_framework import permissions
 
 class IsAdminUser(permissions.BasePermission):
     """
@@ -30,8 +54,11 @@ class IsAdminUser(permissions.BasePermission):
     """
 
     def has_permission(self, request, view):
-        return request.user.is_authenticated and request.user.Role_id == 1
-
+        return (
+            request.user.is_authenticated
+            and request.user.role  # Ensure role is assigned
+            and request.user.role.name == Role.ADMIN
+        )
 
 
 

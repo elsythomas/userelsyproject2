@@ -151,5 +151,6 @@ REST_FRAMEWORK = {
     ),
 }
 
+FRONTEND_URL = "https://yourfrontend.com"
 
 # AUTH_USER_MODEL = 'myapp.User'  # Ensure this is correctly set

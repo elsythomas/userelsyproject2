@@ -12,7 +12,7 @@ class Role(models.Model):
         (TEACHER, 'Teacher'),
         (STUDENT, 'Student'),
     ]
-
+    id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=50, unique=True, choices=ROLE_CHOICES)
     # description = models.TextField(blank=True, null=True)
 
@@ -21,6 +21,11 @@ class Role(models.Model):
     
     
 class User(AbstractUser):
+    
+    
+    
+    role = models.ForeignKey(Role, on_delete=models.SET_NULL, null=True, blank=True)
+    
     groups = models.ManyToManyField(
         "auth.Group",
         related_name="custom_user_set",
@@ -40,5 +45,5 @@ from django.contrib.auth.models import User
 class Profile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     image = models.ImageField(upload_to='profile_pics/', null=True, blank=True)
-
+    
     
