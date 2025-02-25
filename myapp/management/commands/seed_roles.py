@@ -17,10 +17,4 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS('Roles seeding completed!'))
 
 
-from django.contrib.auth.models import Group
-from myapp.models import Role
 
-for group in Group.objects.all():
-    Role.objects.get_or_create(name=group.name)
-
-print("Migration complete!")

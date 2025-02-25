@@ -5,6 +5,7 @@ from django.contrib.auth.views import LoginView
 
 from .views import (
     SignupView,
+    login,
     VerifyEmailView,
     create_user,
     get_user,
@@ -13,13 +14,16 @@ from .views import (
     user_list,
     RequestPasswordReset,
     ResetPassword,
+    role_crud,
 )
 
 urlpatterns = [
     # Authentication URLs
     path("signup/", SignupView.as_view(), name="signup"),
     path("verify-email/<str:token>/", VerifyEmailView.as_view(), name="verify-email"),
-    path("login/", LoginView.as_view(template_name="login.html"), name="login"),
+        path('login/', login, name='login'),
+
+    # path("login/", LoginView.as_view(template_name="login.html"), name="login"),
     
     # User Management URLs
     path('users/', user_list, name='user_list'),
@@ -28,6 +32,11 @@ urlpatterns = [
     path('users/<int:user_id>/edit/', user_edit, name='user_edit'),
     path('users/<int:user_id>/delete/', user_delete, name='user_delete'),
     
+    
+    #ROLE Urls
+    path('api/roles/', role_crud, name='role_crud'),
+    path('api/roles/<int:role_id>/', role_crud, name='role_crud_detail'),
+
     # Password Reset URLs
     path('api/request-password-reset/', RequestPasswordReset.as_view(), name='request-password-reset'),
     path('api/reset-password/', ResetPassword.as_view(), name='reset-password'),

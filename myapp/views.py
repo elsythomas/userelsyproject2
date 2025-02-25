@@ -1,3 +1,4 @@
+from myapp.permissions import IsAdminOrTeacher, IsAdminUser
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -5,56 +6,17 @@ from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password
 from django.core.mail import send_mail
 from django.conf import settings
-from rest_framework.permissions import AllowAny
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+
 from itsdangerous import URLSafeTimedSerializer
 from django.urls import reverse
 
 # Create a serializer instance
 serializer = URLSafeTimedSerializer(settings.SECRET_KEY)
 
-# class SignupView(APIView):
-#     permission_classes = [AllowAny]
-
-#     def post(self, request):
-#         name = request.data.get("name")
-#         email = request.data.get("email")
-#         password = request.data.get("password")
-
-#         if not name or not email or not password:
-#             return Response({"error": "All fields are required"}, status=status.HTTP_400_BAD_REQUEST)
-
-#         if User.objects.filter(email=email).exists():
-#             return Response({"error": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST)
-
-#         user = User.objects.create(
-#             username=name,
-#             email=email,
-#             password=make_password(password)
-#         )
-
-#         # Generate a secure token
-#         token = serializer.dumps(email, salt="email-confirm")
-
-#         # Create a verification link
-#         verification_url = request.build_absolute_uri(
-#             reverse("verify-email", kwargs={"token": token})
-#         )
-
-#         # Load the email template and replace variables
-#         email_body = render_to_string("email_verified.html", {
-#             "name": name,
-#             "verification_url": verification_url
-#         })
-
-#         # Send the email
-#         subject = "Verify Your Email"
-#         message = f"Hi {name},\n\nClick the link below to verify your email:\n\n{verification_url}\n\nBest regards,\nYour Company"
-#         from_email = settings.EMAIL_HOST_USER
-#         recipient_list = [email]
-
-#         send_mail(subject, message, from_email, recipient_list, fail_silently=False)
-
-#         return Response({"message": "User created successfully. Please check your email to verify your account."}, status=status.HTTP_201_CREATED)
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password
 from rest_framework.response import Response
@@ -66,13 +28,13 @@ from django.template.loader import render_to_string
 from django.core.mail import EmailMultiAlternatives
 from django.conf import settings
 from itsdangerous import URLSafeTimedSerializer
-from .models import Profile, Role  # Assuming Role model exists
+from .models import Profile, User  # Assuming Role model exists
 
 # Initialize serializer for email verification token
 serializer = URLSafeTimedSerializer(settings.SECRET_KEY)
 
 class SignupView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAdminOrTeacher]
 
     def post(self, request):
         name = request.data.get("name")
@@ -133,7 +95,7 @@ from django.template.loader import render_to_string
 from django.core.mail import EmailMultiAlternatives
 
 class SignupView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAdminOrTeacher]
 
     def post(self, request):
         name = request.data.get("name")
@@ -179,6 +141,33 @@ class SignupView(APIView):
 
         return Response({"message": "User created successfully. Please check your email to verify your account."}, status=status.HTTP_201_CREATED)
 
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
+from .models import User
+
+@api_view(['POST'])
+@permission_classes([])
+def login(request):
+    username = request.data.get("username")
+    email = request.data.get("email")
+
+    user = User.objects.filter(username=username, email=email).first()
+    
+    if user:
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            "username": user.username,
+            "email": user.email,
+            "refresh": str(refresh),
+            "access": str(refresh.access_token)
+        })
+    else:
+        return Response({"error": "Invalid credentials"}, status=400)
+
 
 from django.http import HttpResponse
 from django.shortcuts import render
@@ -186,7 +175,7 @@ from itsdangerous.exc import BadSignature, SignatureExpired
 
 
 class VerifyEmailView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAdminOrTeacher]
 
     def get(self, request, token):
         try:
@@ -207,38 +196,6 @@ def verify_email(request,token):
     return render(request, "myapp/email_verified.html")  
 
 
-# from django.contrib.auth.models import User
-# from rest_framework.response import Response
-# from rest_framework.decorators import api_view
-# from .serializers import UserSerializer
-
-# @api_view(['GET'])
-# def get_users(request):
-#     user = User.objects.all()  # Fetch all users
-#     serializer = UserSerializer(user, many=True)
-#     return Response(serializer.data)
-
-        
-
-from django.contrib.auth.models import User
-from django.http import JsonResponse
-from django.shortcuts import get_object_or_404
-from django.views.decorators.csrf import csrf_exempt
-# import json
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.response import Response
-from rest_framework import status
-# from myapp.models import Role  # Import Role model
-
-# Create a user
-from django.contrib.auth.models import User
-from django.http import JsonResponse
-from django.shortcuts import get_object_or_404
-from django.views.decorators.csrf import csrf_exempt
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.response import Response
-from rest_framework import status
-from myapp.models import Role  # Import Role model
 
 # Create a user
 from django.contrib.auth.models import User
@@ -250,7 +207,7 @@ from django.conf import settings
 from .models import Profile  # Assuming you have a Profile model for extra user fields
 
 @api_view(['POST'])
-@permission_classes([])
+@permission_classes([IsAdminOrTeacher])
 def create_user(request):
     data = request.data
     username = data['username']
@@ -292,7 +249,7 @@ def create_user(request):
 
 # Get user details
 @api_view(['GET'])
-@permission_classes([])
+@permission_classes([IsAdminOrTeacher])
 def get_user(request, user_id):
     user = get_object_or_404(User, id=user_id)
     return Response({'id': user.id, 'username': user.username, 'email': user.email, 'role':user.role}, status=status.HTTP_200_OK)
@@ -321,7 +278,7 @@ def user_edit(request, user_id):
 
 # Delete a user
 @api_view(['DELETE'])
-@permission_classes([])
+@permission_classes([IsAdminOrTeacher])
 def user_delete(request, user_id):
     user = get_object_or_404(User, id=user_id)
     user.delete()
@@ -334,32 +291,44 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
 from .models import Profile  # Assuming you have a Profile model
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from .models import User, Profile  # Ensure these models are correctly imported
 
 @api_view(['GET'])
 @permission_classes([])
 def user_list(request, user_id=None):
     if user_id:
         user = get_object_or_404(User, id=user_id)
-        profile = Profile.objects.filter(user=user).first()  # Fetch profile if exists
-
+        profile = Profile.objects.filter(user=user).first()
+        
+        full_name = f"{user.first_name} {user.last_name}".strip()
+        name = full_name if full_name else user.username  # Use username if full_name is empty
+        
         return Response({
             "id": user.id,
+            "name": name,
             "email": user.email,
             "role": user.role.name if hasattr(user, 'role') else None,
             "image": request.build_absolute_uri(profile.image.url) if profile and profile.image else None
         }, status=status.HTTP_200_OK)
     
     else:
-        users = User.objects.all().values("id", "first_name", "last_name", "email")
+        users = User.objects.all().values("id", "first_name", "last_name", "username", "email")
         user_list = []
 
         for user in users:
             profile = Profile.objects.filter(user_id=user["id"]).first()
+            full_name = f"{user['first_name']} {user['last_name']}".strip()
+            name = full_name if full_name else user["username"]  # Use username if first_name & last_name are empty
+            
             user_list.append({
                 "id": user["id"],
-                "first_name": user["first_name"],
-                "last_name": user["last_name"],
+                "name": name,
                 "email": user["email"],
+                "role": user.role.name if hasattr(user, 'role') else None,
                 "image": request.build_absolute_uri(profile.image.url) if profile and profile.image else None
             })
 
@@ -370,16 +339,95 @@ def user_list(request, user_id=None):
 # def user_list(request, user_id=None):
 #     if user_id:
 #         user = get_object_or_404(User, id=user_id)
+#         profile = Profile.objects.filter(user=user).first()  # Fetch profile if exists
+
+#         full_name = f"{user.first_name} {user.last_name}".strip()
+#         name = full_name if full_name else user.username  # Use username if full_name is empty
+
 #         return Response({
-#             "id": user.id,
-#             # "first_name": user.first_name,
-#             # "last_name": user.last_name,
-#             "email": user.email,
-#             "role": user.role.name if hasattr(user, 'role') else None,
-#         }, status=status.HTTP_200_OK)
+#     "id": user.id,
+#     "name": name,
+#     "email": user.email,
+#     "password": user.raw_password,  # ⚠️ This is NOT secure!
+#     "role": user.role.name if hasattr(user, 'role') else None,
+#     "image": request.build_absolute_uri(profile.image.url) if profile and profile.image else None
+# })
+#         # return Response({
+#         #     "id": user.id,
+#         #     "name": name,  # Ensure name is always present
+#         #     "email": user.email,
+#         #     "password": user.password,  # Hashed password (not plaintext)
+#         #     "role": user.role.name if hasattr(user, 'role') else None,
+#         #     "image": request.build_absolute_uri(profile.image.url) if profile and profile.image else None
+#         # }, status=status.HTTP_200_OK)
+    
 #     else:
-#         users = User.objects.all().values("id", "first_name", "last_name", "email")
-#         return Response({"users": list(users)}, status=status.HTTP_200_OK)
+#         users = User.objects.all().values("id", "first_name", "last_name", "username", "email", "password")  # Fetch username as well
+#         user_list = []
+
+#         for user in users:
+#             profile = Profile.objects.filter(user_id=user["id"]).first()
+#             full_name = f"{user['first_name']} {user['last_name']}".strip()
+#             name = full_name if full_name else user["username"]  # Use username if first_name & last_name are empty
+            
+#             user_list.append({
+#                 "id": user["id"],
+#                 "name": name,  # Ensure name is correctly assigned
+#                 "first_name": user["first_name"],
+#                 "last_name": user["last_name"],
+#                 "email": user["email"],
+#                 "password": user["password"],  # Hashed password
+#                 "image": request.build_absolute_uri(profile.image.url) if profile and profile.image else None
+#             })
+
+#         return Response({"users": user_list}, status=status.HTTP_200_OK)
+
+# @api_view(['GET'])
+#ROLE CREATION CRUD
+# Role CRUD API
+@api_view(['POST', 'GET', 'PUT', 'DELETE'])
+@permission_classes([IsAdminUser])
+def role_crud(request, role_id=None):
+    if request.method == 'POST':
+        name = request.data.get('name')
+
+        if Role.objects.filter(name=name).exists():
+            return Response({"error": f"Role {name} already exists."}, status=status.HTTP_400_BAD_REQUEST)
+
+        role = Role(name=name)
+        role.save()
+        return Response({"message": f"Role {name} created successfully."}, status=status.HTTP_201_CREATED)
+
+    if request.method == 'GET':
+        if role_id:
+            try:
+                role = Role.objects.get(id=role_id)
+                return Response({"id": role.id, "name": role.name})
+            except Role.DoesNotExist:
+                return Response({"error": "Role not found."}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            roles = Role.objects.all().values()
+            return Response({"roles": list(roles)})
+
+    if request.method == 'PUT':
+        try:
+            role = Role.objects.get(id=role_id)
+            role.name = request.data.get('name', role.name)
+            role.save()
+            return Response({"message": "Role updated successfully."})
+        except Role.DoesNotExist:
+            return Response({"error": "Role not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'DELETE':
+        try:
+            role = Role.objects.get(id=role_id)
+            role.delete()
+            return Response({"message": "Role deleted successfully."})
+        except Role.DoesNotExist:
+            return Response({"error": "Role not found."}, status=status.HTTP_404_NOT_FOUND)
+
+
+
 
 
 
@@ -395,7 +443,7 @@ from django.core.cache import cache  # Using cache to store tokens temporarily
 
 # Endpoint to request a password reset
 class RequestPasswordReset(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = []
 
     def post(self, request):
         email = request.POST.get('email')
@@ -415,7 +463,7 @@ class RequestPasswordReset(APIView):
 
 # Endpoint to reset password
 class ResetPassword(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = []
 
     def post(self, request):
         token = request.POST.get('token')
