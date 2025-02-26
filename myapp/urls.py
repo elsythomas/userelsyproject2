@@ -15,13 +15,16 @@ from .views import (
     RequestPasswordReset,
     ResetPassword,
     role_crud,
+    BulkUserCreateView,
 )
 
 urlpatterns = [
     # Authentication URLs
     path("signup/", SignupView.as_view(), name="signup"),
     path("verify-email/<str:token>/", VerifyEmailView.as_view(), name="verify-email"),
-        path('login/', login, name='login'),
+    path('login/', login, name='login'),
+    path('bulk-user-upload/', BulkUserCreateView.as_view(), name='bulk-user-upload'),
+
 
     # path("login/", LoginView.as_view(template_name="login.html"), name="login"),
     
@@ -40,6 +43,7 @@ urlpatterns = [
     # Password Reset URLs
     path('api/request-password-reset/', RequestPasswordReset.as_view(), name='request-password-reset'),
     path('api/reset-password/', ResetPassword.as_view(), name='reset-password'),
+    
 ]
 
 # Serve media files in development

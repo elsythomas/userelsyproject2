@@ -1,4 +1,5 @@
 from myapp.permissions import IsAdminOrTeacher, IsAdminUser
+from myapp.serializers import BulkUserCreateSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -557,3 +558,168 @@ class ResetPassword(APIView):
         return Response({'message': 'Password reset successful'}, status=status.HTTP_200_OK)
 
 
+from django.contrib.auth.hashers import make_password
+from myapp.models import Role, User  # ✅ Import User and Role models
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.views import APIView
+import pandas as pd
+
+class BulkUserCreateView(APIView):
+    def post(self, request, *args, **kwargs):
+        serializer = BulkUserCreateSerializer(data=request.data)
+        if serializer.is_valid():
+            file = serializer.validated_data['file']
+            
+            try:
+                df = pd.read_excel(file)
+
+                # Ensure required columns exist
+                required_columns = {'username', 'email', 'password', 'role'}
+                if not required_columns.issubset(df.columns):
+                    return Response({"error": "Excel file must contain columns: username, email, password, role"},
+                                    status=status.HTTP_400_BAD_REQUEST)
+
+                users_created = 0
+                for _, row in df.iterrows():
+                    if not User.objects.filter(username=row['username']).exists():
+                        role_instance = Role.objects.filter(name=row['role'].strip().lower()).first()
+                        
+                        if not role_instance:
+                            return Response({"error": f"Invalid role: {row['role']}"}, 
+                                            status=status.HTTP_400_BAD_REQUEST)
+
+                        # ✅ Create the user instance
+                        user = User()
+                        user.username = row['username']
+                        user.email = row['email']
+                        user.password = make_password(row['password'])  # ✅ Hash password
+                        user.role = role_instance  # ✅ Assign ForeignKey properly
+
+                        user.save()  # ✅ Save the user instance correctly
+                        users_created += 1
+
+                return Response({"message": f"{users_created} users created successfully."}, 
+                                status=status.HTTP_201_CREATED)
+
+            except Exception as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# import pandas as pd
+# from rest_framework.response import Response
+# from rest_framework import status
+# from rest_framework.views import APIView
+# from myapp.serializers import BulkUserCreateSerializer
+# from django.contrib.auth import get_user_model
+# from django.contrib.auth.hashers import make_password
+# from myapp.models import Role, User
+
+# User = get_user_model()
+
+# class BulkUserCreateView(APIView):
+#     """
+#     API View for bulk user creation using an uploaded Excel file.
+#     """
+    
+#     def post(self, request, *args, **kwargs):
+#         serializer = BulkUserCreateSerializer(data=request.data)
+#         if serializer.is_valid():
+#             file = serializer.validated_data['file']
+            
+#             try:
+#                 # Read Excel file
+#                 df = pd.read_excel(file)
+#                 df.rename(columns={'user': 'username'}, inplace=True)
+
+#                 # ✅ Debugging: Print actual column names
+#                 print("Excel Columns:", df.columns.tolist())  
+
+#                 # Ensure required columns exist
+#                 required_columns = {'username', 'email', 'password', 'role'}
+#                 if not required_columns.issubset(df.columns):
+#                     return Response(
+#                         {"error": f"Excel file must contain columns: {', '.join(required_columns)}"},
+#                         status=status.HTTP_400_BAD_REQUEST
+#                     )
+#                 from myapp.models import Role 
+#                 users_to_create = []
+#                 for _, row in df.iterrows():
+#                     if not User.objects.filter(username=row['username']).exists():  # Avoid duplicate users
+#                         role_instance = Role.objects.filter(name=row['role'].strip().lower()).first()
+                       
+#                         users_to_create.append(
+#                             User(
+#                                 username=row['username'],
+#                                 email=row['email'],
+#                                 password=row['password'],  # Ensure password hashing is handled
+#                                 # role=role_instance,  # Ensure your User model has a role field
+#                             )
+#                         )
+                        
+#                         setattr(User, 'role', role_instance)
+#                         User.save()  # ✅ Save each user separately
+#                         users_created += 1# ✅ Assign role dynamically
+#                         # users_to_create.append(User)
+                
+#                 # Bulk create users
+#                 User.objects.bulk_create(users_to_create)
+
+#                 return Response(
+#                     {"message": f"{len(users_to_create)} users created successfully."},
+#                     status=status.HTTP_201_CREATED
+#                 )
+
+#             except Exception as e:
+#                 print(f"Error Occurred: {str(e)}") 
+#                 return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# import pandas as pd
+# from myapp.serializers import BulkUserCreateSerializer
+
+# class BulkUserCreateView(APIView):
+#     """
+#     API View for bulk user creation using an uploaded Excel file.
+#     """
+    
+#     def post(self, request, *args, **kwargs):
+#         serializer = BulkUserCreateSerializer(data=request.data)
+#         if  not serializer.is_valid():
+#             print(f"Validation Errors: {serializer.errors}")  
+#             file = serializer.validated_data['file']
+            
+#             try:
+#                 # Read Excel file
+#                 df = pd.read_excel(file)
+                
+#                 # Ensure required columns exist
+#                 required_columns = {'username', 'email', 'password', 'role'}
+#                 if not required_columns.issubset(df.columns):
+#                     return Response({"error": "Excel file must contain columns: username, email, password, role"},
+#                                     status=status.HTTP_400_BAD_REQUEST)
+                
+#                 users_to_create = []
+#                 for _, row in df.iterrows():
+#                     if not User.objects.filter(username=row['username']).exists():  # Avoid duplicate users
+#                         users_to_create.append(
+#                             User(
+#                                 username=row['username'],
+#                                 email=row['email'],
+#                                 role=row['role'],  # Ensure your User model has a role field
+#                             )
+#                         )
+                
+#                 # Bulk create users
+#                 User.objects.bulk_create(users_to_create)
+
+#                 return Response({"message": f"{len(users_to_create)} users created successfully."},
+#                                 status=status.HTTP_201_CREATED)
+
+#             except Exception as e:
+#                 return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

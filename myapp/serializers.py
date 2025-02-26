@@ -38,3 +38,13 @@ class UserSerializer(serializers.ModelSerializer):
         return "Active" 
     
     
+class BulkUserCreateSerializer(serializers.Serializer):
+    file = serializers.FileField()
+
+    def validate_file(self, value):
+        """Ensure the uploaded file is an Excel file."""
+        print(f"Received file: {value.name}")  # ✅ Debugging
+        print(f"File Name: {value.name}")
+        if not value.name.endswith(('.xls', '.xlsx')):
+            raise serializers.ValidationError("Only Excel files are allowed.")
+        return value

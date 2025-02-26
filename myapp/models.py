@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
-
+from .utils import (USER_STATUS,USER_TYPE,ROLE_STATUS,ROLE_STATUS_DETAILS,ROLE_TYPE)
 
 class Role(models.Model):
     ADMIN = 'admin'
