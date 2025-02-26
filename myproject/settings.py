@@ -154,3 +154,26 @@ REST_FRAMEWORK = {
 FRONTEND_URL = "https://yourfrontend.com"
 
 # AUTH_USER_MODEL = 'myapp.User'  # Ensure this is correctly set
+
+
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=12),  # Increase access token lifetime
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),   # Increase refresh token lifetime
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "ALGORITHM": "HS256",
+    "SIGNING_KEY": SECRET_KEY,
+    "VERIFYING_KEY": None,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "user_id",
+}
+
+
+from django.conf import settings
+
+SIMPLE_JWT = {
+    "SIGNING_KEY": settings.SECRET_KEY,  # ✅ Use settings.SECRET_KEY only outside settings.py
+}

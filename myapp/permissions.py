@@ -41,6 +41,7 @@ class IsAdminOrTeacher(permissions.BasePermission):
     """
 
     def has_permission(self, request, view):
+        print(request.user.id)
         return (
             request.user.is_authenticated
             and request.user.role  # Ensure role is assigned
