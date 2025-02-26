@@ -153,7 +153,7 @@ REST_FRAMEWORK = {
 
 FRONTEND_URL = "https://yourfrontend.com"
 
-# AUTH_USER_MODEL = 'myapp.User'  # Ensure this is correctly set
+AUTH_USER_MODEL = 'myapp.Student'  # Ensure this is correctly set
 
 
 from datetime import timedelta

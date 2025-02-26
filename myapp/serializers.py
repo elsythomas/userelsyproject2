@@ -1,15 +1,15 @@
 # from django.contrib.auth.models import User
+from myapp.models import Student
 from rest_framework import serializers
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth import get_user_model
 User = get_user_model()  
-
 class ResetPasswordSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
     confirm_password = serializers.CharField(write_only=True)
 
     class Meta:
-        model = User
+        model = Student
         fields = ["password", "confirm_password"]
 
     def validate(self, data):
@@ -19,9 +19,33 @@ class ResetPasswordSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         instance.password = make_password(validated_data["password"])
-        instance.is_active = True  # ✅ Set user as active after reset
+        instance.is_active = True  # ✅ Activate user after reset
         instance.save()
         return instance
+
+
+# class ResetPasswordSerializer(serializers.ModelSerializer):
+#     password = serializers.CharField(write_only=True)
+#     confirm_password = serializers.CharField(write_only=True)
+
+#     class Meta:
+#         model = User
+#         fields = ["password", "confirm_password"]
+
+#     def validate(self, data):
+#         if data["password"] != data["confirm_password"]:
+#             raise serializers.ValidationError("Passwords do not match!")
+#         return data
+
+#     def update(self, instance, validated_data):
+#         instance.set_password(validated_data["password"])  # ✅ More secure
+#         instance.is_active = True  
+#         instance.save()
+#         return instance
+        # instance.password = make_password(validated_data["password"])
+        # instance.is_active = True  # ✅ Set user as active after reset
+        # instance.save()
+        # return instance
 
     
 # from rest_framework import serializers
@@ -31,7 +55,7 @@ class UserSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
     class Meta:
         model = User
-        fields = ["id", "username", "email", "status","image"]
+        fields = ["id", "name", "email", "status","image"]
         
 
     def get_status(self, obj):

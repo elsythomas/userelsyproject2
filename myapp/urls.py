@@ -12,8 +12,8 @@ from .views import (
     user_edit,
     user_delete,
     user_list,
-    RequestPasswordReset,
-    ResetPassword,
+    # RequestPasswordReset,
+    update_password,
     role_crud,
     BulkUserCreateView,
 )
@@ -41,8 +41,8 @@ urlpatterns = [
     path('api/roles/<int:role_id>/', role_crud, name='role_crud_detail'),
 
     # Password Reset URLs
-    path('api/request-password-reset/', RequestPasswordReset.as_view(), name='request-password-reset'),
-    path('api/reset-password/', ResetPassword.as_view(), name='reset-password'),
+    # path('api/request-password-reset/', RequestPasswordReset.as_view(), name='request-password-reset'),
+    path('update-password/', update_password, name='update-password'),
     
 ]
 
