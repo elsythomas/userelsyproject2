@@ -5,60 +5,55 @@ from django.core.mail import EmailMultiAlternatives
 from django.conf import settings
 from django.urls import reverse
 from myapp import serializers
-from myapp.permissions import IsAdminOrTeacher
+from myapp.models import Student, Role, Profile  # ✅ Correct import
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
-from myapp.models import Student, Role
-from rest_framework.permissions import IsAuthenticated
-
 
 class SignupView(APIView):
     def post(self, request):
         name = request.data.get("name")
         email = request.data.get("email")
         password = request.data.get("password")
-        role_id = request.data.get("role_id")  # Get role_id from request
-        image = request.FILES.get("image")  # Get profile image
+        role_id = request.data.get("role_id")
+        image = request.FILES.get("image")
 
-        print("Received Data:", request.data)  # Debugging
-        print("Received Files:", request.FILES)  # Debugging
-        print("Received Role ID:", role_id)  # Debugging
+        print("Received Data:", request.data)
+        print("Received Files:", request.FILES)
+        print("Received Role ID:", role_id)
 
-        # Validate required fields
-        if not name or not email or not password or role_id is None:
+        # Validate input
+        if not name or not email or not password or not role_id:
             return Response({"error": "All fields including role_id are required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Check if email already exists
         if Student.objects.filter(email=email).exists():
             return Response({"error": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Get role
-        role = get_object_or_404(Role, id=role_id)
+        # Validate role
+        try:
+            role = Role.objects.get(id=role_id)
+        except Role.DoesNotExist:
+            return Response({"error": "Invalid role ID"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Create user
-        user = Student(email=email, name=name)
-        user.set_password(password)  # Secure password hashing
+        # Create user with role
+        user = Student(email=email, name=name, role=role, image=image)
+        user.set_password(password)
         user.save()
 
-        # Create profile
-        profile = Profile.objects.create(user=user, image=image if image else None, role=role)
-        print(f"Created Profile: {profile}")  # Debugging
+        # Create profile with image
+        profile = Profile.objects.create(user=user, image=image if image else None,role=role )
+        print(f"Created Profile: {profile}")
 
-        # Generate a secure token for email verification
+        # Email verification logic remains the same
         signer = Signer()
         token = signer.sign(email)
-
-        # Create a verification link
         verification_url = request.build_absolute_uri(reverse("verify-email", kwargs={"token": token}))
 
-        # Load email template and replace variables
         email_body = render_to_string("email_verified.html", {
             "name": name,
             "verification_url": verification_url
         })
 
-        # Send the email
         subject = "Verify Your Email"
         from_email = settings.EMAIL_HOST_USER
         recipient_list = [email]
@@ -67,7 +62,79 @@ class SignupView(APIView):
         email_message.attach_alternative(email_body, "text/html")
         email_message.send()
 
-        return Response({"message": "User created successfully. Please check your email to verify your account."}, status=status.HTTP_201_CREATED)
+        return Response({"message": "User created successfully. Check your email for verification."}, status=status.HTTP_201_CREATED)
+
+# # from profile import Profile
+# from django.shortcuts import get_object_or_404
+# from django.core.signing import Signer
+# from django.template.loader import render_to_string
+# from django.core.mail import EmailMultiAlternatives
+# from django.conf import settings
+# from django.urls import reverse
+# from myapp import serializers
+# from myapp.permissions import IsAdminOrTeacher
+# from rest_framework.response import Response
+# from rest_framework.views import APIView
+# from rest_framework import status
+# from myapp.models import Student, Role,Profile
+# from rest_framework.permissions import IsAuthenticated
+
+
+# class SignupView(APIView):
+#     def post(self, request):
+#         name = request.data.get("name")
+#         email = request.data.get("email")
+#         password = request.data.get("password")
+#         role_id = request.data.get("role_id")  # Get role_id from request
+#         image = request.FILES.get("image")  # Get profile image
+
+#         print("Received Data:", request.data)  # Debugging
+#         print("Received Files:", request.FILES)  # Debugging
+#         print("Received Role ID:", role_id)  # Debugging
+
+#         # Validate required fields
+#         if not name or not email or not password or role_id is None:
+#             return Response({"error": "All fields including role_id are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+#         # Check if email already exists
+#         if Student.objects.filter(email=email).exists():
+#             return Response({"error": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST)
+
+#         # Get role
+#         role = get_object_or_404(Role, id=role_id)
+
+#         # Create user
+#         user = Student(email=email, name=name, role=role)
+#         user.set_password(password)  # Secure password hashing
+#         user.save()
+
+#         # Create profile
+#         profile = Profile.objects.create(user=user, image=image if image else None)
+#         print(f"Created Profile: {profile}")  # Debugging
+
+#         # Generate a secure token for email verification
+#         signer = Signer()
+#         token = signer.sign(email)
+
+#         # Create a verification link
+#         verification_url = request.build_absolute_uri(reverse("verify-email", kwargs={"token": token}))
+
+#         # Load email template and replace variables
+#         email_body = render_to_string("email_verified.html", {
+#             "name": name,
+#             "verification_url": verification_url
+#         })
+
+#         # Send the email
+#         subject = "Verify Your Email"
+#         from_email = settings.EMAIL_HOST_USER
+#         recipient_list = [email]
+
+#         email_message = EmailMultiAlternatives(subject, "", from_email, recipient_list)
+#         email_message.attach_alternative(email_body, "text/html")
+#         email_message.send()
+
+#         return Response({"message": "User created successfully. Please check your email to verify your account."}, status=status.HTTP_201_CREATED)
 
 # from django.contrib.auth import get_user_model
 # from django.contrib.auth.hashers import make_password
@@ -637,7 +704,7 @@ from itsdangerous.exc import BadSignature, SignatureExpired
 
 
 class VerifyEmailView(APIView):
-    permission_classes = [IsAdminOrTeacher]
+    # permission_classes = [IsAdminOrTeacher]
 
     def get(self, request, token):
         try:
@@ -936,9 +1003,7 @@ def user_delete(request, user_id):
     return Response({"message": "User deleted successfully."}, status=status.HTTP_200_OK)
 
 
-
-
-from myapp.models import Student  # Import Student instead of User
+from myapp.models import Student  
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
@@ -948,34 +1013,74 @@ from django.shortcuts import get_object_or_404
 @permission_classes([])
 def user_list(request, user_id=None):
     if user_id:
-        user = get_object_or_404(Student, id=user_id)  # Change User to Student
+        user = get_object_or_404(Student, id=user_id)
 
-        full_name = f"{user.name}".strip()  # Since 'name' is used instead of 'first_name' and 'last_name'
+        full_name = f"{user.name}".strip()
 
         return Response({
             "id": user.id,
             "name": full_name,
             "email": user.email,
             "role": user.role.id if user.role else None,  
-            "image": request.build_absolute_uri(user.image.url) if user.image else None,  
+            "image": request.build_absolute_uri(user.image.url) if user.image and hasattr(user.image, "url") else None ,
             "status": "active" if user.is_active else "pending"
         }, status=status.HTTP_200_OK)
 
     else:
-        users = Student.objects.all().values("id", "name", "email", "is_active", "role_id")
+        users = Student.objects.all()  # ✅ Fetch full objects instead of .values()
 
         user_list = []
         for user in users:
             user_list.append({
-                "id": user["id"],
-                "name": user["name"],
-                "email": user["email"],
-                "role": user["role_id"],
-                "image": None,
-                "status": "active" if user["is_active"] else "pending"
+                "id": user.id,
+                "name": user.name,
+                "email": user.email,
+                "role": user.role.id if user.role else None,
+                "image": request.build_absolute_url(user.image.url) if user.image else None,  # ✅ Now image is returned
+                "status": "active" if user.is_active else "pending"
             })
 
         return Response({"users": user_list}, status=status.HTTP_200_OK)
+
+
+# from myapp.models import Student  # Import Student instead of User
+# from rest_framework.decorators import api_view, permission_classes
+# from rest_framework.response import Response
+# from rest_framework import status
+# from django.shortcuts import get_object_or_404
+
+# @api_view(['GET'])
+# @permission_classes([])
+# def user_list(request, user_id=None):
+#     if user_id:
+#         user = get_object_or_404(Student, id=user_id)  # Change User to Student
+
+#         full_name = f"{user.name}".strip()  # Since 'name' is used instead of 'first_name' and 'last_name'
+
+#         return Response({
+#             "id": user.id,
+#             "name": full_name,
+#             "email": user.email,
+#             "role": user.role.id if user.role else None,  
+#             "image": request.build_absolute_uri(user.image.url) if user.image else None,  
+#             "status": "active" if user.is_active else "pending"
+#         }, status=status.HTTP_200_OK)
+
+#     else:
+#         users = Student.objects.all()
+
+#         user_list = []
+#         for user in users:
+#             user_list.append({
+#                 "id": user["id"],
+#                 "name": user["name"],
+#                 "email": user["email"],
+#                 "role": user["role_id"],
+#                 "image": None,
+#                 "status": "active" if user["is_active"] else "pending"
+#             })
+
+#         return Response({"users": user_list}, status=status.HTTP_200_OK)
 
 # List users or get details of a specific user
 # from myapp.models import User

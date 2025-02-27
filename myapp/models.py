@@ -44,6 +44,14 @@ class Student(AbstractUser):
 
     def __str__(self):
         return self.email
+    
+    
+    
+class Profile(models.Model):
+    user = models.OneToOneField("myapp.Student", on_delete=models.CASCADE)  # Reference custom user model
+    image = models.ImageField(upload_to="profile_pics/", null=True, blank=True)
+    role = models.ForeignKey(Role, on_delete=models.CASCADE)
+
 # from django.db import models
 # from django.contrib.auth.models import BaseUserManager, AbstractBaseUser
 
