@@ -25,11 +25,11 @@
 #     'in_active': 'InActive'
 # }
 
-# ROLE_TYPE = (
-#     ('admin', 'Admin Role'),
-#     ('teacher', 'Teacher Role'),
-#     ('student', ' Student Role'),
-# )
+ROLE_TYPE = (
+    ('admin', 'Admin Role'),
+    ('teacher', 'Teacher Role'),
+    ('student', ' Student Role'),
+)
 
 # ROLE_TYPE_DETAILS = {
 #     'admin': 'Admin Role',
@@ -45,3 +45,10 @@ STATUS_CHOICES = [
     (STATUS_PENDING, 'Pending'),
     (STATUS_ACTIVE, 'Active'),
 ]
+
+USER_STATUS =(
+    ('active', 'Active'),
+    ('pending', 'Pending'),
+    
+)
+

@@ -6,6 +6,7 @@ from django.conf import settings
 from django.urls import reverse
 from myapp import serializers
 from myapp.models import Student, Role, Profile  # ✅ Correct import
+from myapp.utils import USER_STATUS
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
@@ -734,12 +735,15 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
-from .permissions import IsAdminOrTeacher  # Ensure this is imported
+
+from .permissions import IsAdminOrTeacher ,IsAdmin # Ensure this is imported
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsAdminOrTeacher])
 def create_user(request):
+    # return Response("sucess") 
     print(f"User: {request.user}, Role: {getattr(request.user.role, 'name', 'No Role')}")
+    
 
     if not request.user.is_authenticated:
         return Response({"error": "Authentication required"}, status=401)
@@ -1036,8 +1040,8 @@ def user_list(request, user_id=None):
                 "name": user.name,
                 "email": user.email,
                 "role": user.role.id if user.role else None,
-                "image": request.build_absolute_url(user.image.url) if user.image else None,  # ✅ Now image is returned
-                "status": "active" if user.is_active else "pending"
+                "image": request.build_absolute_uri(user.image.url) if user.image else None,  # ✅ Now image is returned
+                "status": USER_STATUS[0][1] if user.is_active else USER_STATUS[1][1]
             })
 
         return Response({"users": user_list}, status=status.HTTP_200_OK)
@@ -1175,7 +1179,7 @@ def user_list(request, user_id=None):
 #         return Response({"users": user_list}, status=status.HTTP_200_OK)
 
 @api_view(['POST', 'GET', 'PUT', 'DELETE'])
-@permission_classes([])
+@permission_classes([IsAdmin])
 def role_crud(request, role_id=None):
     if request.method == 'POST':
         name = request.data.get('name')

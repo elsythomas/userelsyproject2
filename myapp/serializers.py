@@ -24,32 +24,6 @@ class ResetPasswordSerializer(serializers.ModelSerializer):
         return instance
 
 
-# class ResetPasswordSerializer(serializers.ModelSerializer):
-#     password = serializers.CharField(write_only=True)
-#     confirm_password = serializers.CharField(write_only=True)
-
-#     class Meta:
-#         model = User
-#         fields = ["password", "confirm_password"]
-
-#     def validate(self, data):
-#         if data["password"] != data["confirm_password"]:
-#             raise serializers.ValidationError("Passwords do not match!")
-#         return data
-
-#     def update(self, instance, validated_data):
-#         instance.set_password(validated_data["password"])  # ✅ More secure
-#         instance.is_active = True  
-#         instance.save()
-#         return instance
-        # instance.password = make_password(validated_data["password"])
-        # instance.is_active = True  # ✅ Set user as active after reset
-        # instance.save()
-        # return instance
-
-    
-# from rest_framework import serializers
-# from django.contrib.auth.models import User  # Import User model
 
 class UserSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
