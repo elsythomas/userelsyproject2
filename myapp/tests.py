@@ -140,7 +140,7 @@ class ResetPasswordView(APIView):
 # from django.views.decorators.csrf import csrf_exempt
 # from django.utils.decorators import method_decorator
 
-# @method_decorator(csrf_exempt, name='dispatch')  # ❗ Remove this in production
+# @method_decorator(csrf_exempt, name='dispatch')  # Remove this in production
 # class ResetPasswordAPIView(APIView):
 #     def post(self, request, user_id):
 #         try:
