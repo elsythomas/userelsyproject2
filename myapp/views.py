@@ -1,3 +1,4 @@
+import json
 from django.shortcuts import get_object_or_404
 from django.core.signing import Signer
 from django.template.loader import render_to_string
@@ -5,7 +6,7 @@ from django.core.mail import EmailMultiAlternatives
 from django.conf import settings
 from django.urls import reverse
 from myapp import serializers
-from myapp.models import Student, Role, Profile  # ✅ Correct import
+from myapp.models import Student, Role, Profile  
 from myapp.utils import USER_STATUS
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -127,7 +128,7 @@ def login(request):
         )
 
         return Response({
-            "name": user.name,  # ✅ Use "name" instead of "username"
+            "name": user.name,  
             "email": user.email,
             "refresh": str(refresh),
             "access": str(refresh.access_token),
@@ -178,43 +179,66 @@ from rest_framework import status
 
 from .permissions import IsAdminOrTeacher ,IsAdmin # Ensure this is imported
 
+
+from django.core.cache import cache
+from django.core.mail import EmailMessage
+from django.conf import settings
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
+from rest_framework import status
+from django.contrib.auth import get_user_model
+from .models import Role, Student
+from .permissions import IsAdminOrTeacher
+import redis
+
+User = get_user_model()
+redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)  # Connect to Redis
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsAdminOrTeacher])
 def create_user(request):
-    # return Response("sucess") 
     print(f"User: {request.user}, Role: {getattr(request.user.role, 'name', 'No Role')}")
-    
 
     if not request.user.is_authenticated:
         return Response({"error": "Authentication required"}, status=401)
 
     data = request.data
-    name = data.get('username')  # Store username as name
+    name = data.get('username')  
     email = data.get('email')
     password = data.get('password')
-    image = request.FILES.get('image')  # Handle file upload
     role_id = data.get('role_id')
 
     if not email or not name or not password:
         return Response({'error': 'Name, email, and password are required'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Get role
-    role = Role.objects.filter(id=role_id).first()
-    if not role:
-        return Response({'error': 'Invalid role ID'}, status=status.HTTP_400_BAD_REQUEST)
+    # 🛑 Check if user creation is rate-limited in Redis (Avoid spamming user creation)
+    rate_limit_key = f"user_creation:{request.user.id}"
+    if redis_client.exists(rate_limit_key):
+        return Response({'error': 'Too many requests. Try again later.'}, status=status.HTTP_429_TOO_MANY_REQUESTS)
 
-    # ✅ Create user with status "Pending"
+    redis_client.setex(rate_limit_key, 60, 1)  # Allow one request per minute
+
+    # ✅ Use Redis cache to store roles (reduce database queries)
+    cache_key = f"role_{role_id}"
+    role = cache.get(cache_key)
+
+    if not role:
+        role = Role.objects.filter(id=role_id).first()
+        if not role:
+            return Response({'error': 'Invalid role ID'}, status=status.HTTP_400_BAD_REQUEST)
+        cache.set(cache_key, role, timeout=300)  # Cache role for 5 minutes
+
+    #  ✅ Create user with "Pending" status
     user = Student.objects.create_user(email=email, password=password, name=name, role=role)
-    user.is_active = False  # Deactivate the user initially
+    user.is_active = False  # Deactivate initially
     user.save()
 
-    # ✅ Create Profile & Save Image
-    # profile, _ = profile.objects.get_or_create(user=user, defaults={"image": image})
-
-    # ✅ Secure redirect URL for password reset
+    # ✅ Store password reset URL in Redis (cache for security)
     reset_url = f"https://your-website.com/reset-password/{user.id}"
+    redis_client.setex(f"reset_url:{user.id}", 600, reset_url)  # Store URL for 10 minutes
 
-    # ✅ Email Notification
+    # ✅ Send Email
     subject = "Welcome! Please Reset Your Password"
     html_message = f"""
     <html>
@@ -231,7 +255,6 @@ def create_user(request):
     </html>
     """
 
-    #  Send Email
     email_message = EmailMessage(
         subject,
         html_message,
@@ -242,6 +265,70 @@ def create_user(request):
     email_message.send(fail_silently=False)
 
     return Response({'message': 'User created. Please reset your password to activate the account.', 'id': user.id}, status=status.HTTP_201_CREATED)
+
+# @api_view(['POST'])
+# @permission_classes([IsAuthenticated, IsAdminOrTeacher])
+# def create_user(request):
+#     # return Response("sucess") 
+#     print(f"User: {request.user}, Role: {getattr(request.user.role, 'name', 'No Role')}")
+    
+
+#     if not request.user.is_authenticated:
+#         return Response({"error": "Authentication required"}, status=401)
+
+#     data = request.data
+#     name = data.get('username')  
+#     email = data.get('email')
+#     password = data.get('password')
+#     image = request.FILES.get('image')  
+#     role_id = data.get('role_id')
+
+#     if not email or not name or not password:
+#         return Response({'error': 'Name, email, and password are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+#     # Get role
+#     role = Role.objects.filter(id=role_id).first()
+#     if not role:
+#         return Response({'error': 'Invalid role ID'}, status=status.HTTP_400_BAD_REQUEST)
+
+#     #  Create user with status "Pending"
+#     user = Student.objects.create_user(email=email, password=password, name=name, role=role)
+#     user.is_active = False  # Deactivate the user initially
+#     user.save()
+
+    
+
+#     #  Secure redirect URL for password reset
+#     reset_url = f"https://your-website.com/reset-password/{user.id}"
+
+#     #  Email Notification
+#     subject = "Welcome! Please Reset Your Password"
+#     html_message = f"""
+#     <html>
+#     <body>
+#         <h2>Hi {name}, welcome to our platform!</h2>
+#         <p>Your account has been created successfully, but you need to reset your password before activation.</p>
+#         <p>Click the button below to set your new password:</p>
+#         <a href="{reset_url}" style="display: inline-block; padding: 10px 20px; font-size: 16px; 
+#         color: white; background-color: #007bff; text-decoration: none; border-radius: 5px;">
+#             Reset Password
+#         </a>
+#         <p>After resetting, your account will be activated.</p>
+#     </body>
+#     </html>
+#     """
+
+#     #  Send Email
+#     email_message = EmailMessage(
+#         subject,
+#         html_message,
+#         settings.DEFAULT_FROM_EMAIL,
+#         [email]
+#     )
+#     email_message.content_subtype = "html"
+#     email_message.send(fail_silently=False)
+
+#     return Response({'message': 'User created. Please reset your password to activate the account.', 'id': user.id}, status=status.HTTP_201_CREATED)
 
 
 @api_view(['GET'])
@@ -286,39 +373,89 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
-
 @api_view(['GET'])
-@permission_classes([])
 def user_list(request, user_id=None):
     if user_id:
+        cache_key = f"user_{user_id}"  # Unique Redis key for each user
+        cached_user = cache.get(cache_key)
+
+        if cached_user:
+            print("✅ Cache hit! user data.")
+            return Response({"message": "Cache hit!", "user": json.loads(cached_user)}, status=status.HTTP_200_OK)
+
+        print("❌ Cache miss! Fetching from the database.")
         user = get_object_or_404(Student, id=user_id)
-
-        full_name = f"{user.name}".strip()
-
-        return Response({
+        
+        user_data = {
             "id": user.id,
-            "name": full_name,
+            "name": user.name.strip(),
             "email": user.email,
-            "role": user.role.id if user.role else None,  
-            "image": request.build_absolute_uri(user.image.url) if user.image and hasattr(user.image, "url") else None ,
+            "role": user.role.id if user.role else None,
+            "image": request.build_absolute_uri(user.image.url) if user.image else None,
             "status": "active" if user.is_active else "pending"
-        }, status=status.HTTP_200_OK)
+        }
+
+        cache.set(cache_key, json.dumps(user_data))  #no time
+        return Response({"message": "Cache miss! Data stored.", "user": user_data}, status=status.HTTP_200_OK)
 
     else:
-        users = Student.objects.all()  # ✅ Fetch full objects instead of .values()
+        cache_key = "user_list_cache1"
+        cached_users = cache.get(cache_key)
 
+        if cached_users:
+            print(" Cache hit! Returning cached user list.")
+            return Response({"message": "Cache hit!", "users": json.loads(cached_users)}, status=status.HTTP_200_OK)
+
+        print(" Cache miss! Fetching user list from the database.")
+        users = Student.objects.all()
         user_list = []
+
         for user in users:
             user_list.append({
                 "id": user.id,
                 "name": user.name,
                 "email": user.email,
                 "role": user.role.id if user.role else None,
-                "image": request.build_absolute_uri(user.image.url) if user.image else None,  # ✅ Now image is returned
-                "status": USER_STATUS[0][1] if user.is_active else USER_STATUS[1][1]
+                "image": request.build_absolute_uri(user.image.url) if user.image else None,
+                "status": "active" if user.is_active else "pending"
             })
 
-        return Response({"users": user_list}, status=status.HTTP_200_OK)
+        cache.set(cache_key, json.dumps(user_list))  # no time
+        return Response({"message": "Cache miss! Data stored.", "users": user_list}, status=status.HTTP_200_OK)
+
+
+# @api_view(['GET'])
+# @permission_classes([])
+# def user_list(request, user_id=None):
+#     if user_id:
+#         user = get_object_or_404(Student, id=user_id)
+
+#         full_name = f"{user.name}".strip()
+
+#         return Response({
+#             "id": user.id,
+#             "name": full_name,
+#             "email": user.email,
+#             "role": user.role.id if user.role else None,  
+#             "image": request.build_absolute_uri(user.image.url) if user.image and hasattr(user.image, "url") else None ,
+#             "status": "active" if user.is_active else "pending"
+#         }, status=status.HTTP_200_OK)
+
+#     else:
+#         users = Student.objects.all()  #  Fetch full objects instead of .values()
+
+#         user_list = []
+#         for user in users:
+#             user_list.append({
+#                 "id": user.id,
+#                 "name": user.name,
+#                 "email": user.email,
+#                 "role": user.role.id if user.role else None,
+#                 "image": request.build_absolute_uri(user.image.url) if user.image else None,  # Now image is returned
+#                 "status": USER_STATUS[0][1] if user.is_active else USER_STATUS[1][1]
+#             })
+
+#         return Response({"users": user_list}, status=status.HTTP_200_OK)
 
 
 
@@ -377,9 +514,9 @@ from myapp.permissions import IsAdminOrTeacher  # Ensure you import the correct 
 User = get_user_model()
 
 @api_view(['POST'])
-@permission_classes([IsAdminOrTeacher])  # ✅ Restrict to Admins/Teachers if needed
+@permission_classes([IsAdminOrTeacher])  #  Restrict to Admins/Teachers if needed
 def update_password(request):
-    user_id = request.data.get("user_id")  # ✅ Use user_id instead of email
+    user_id = request.data.get("user_id")  #  Use user_id instead of email
     new_password = request.data.get("new_password")
     confirm_password = request.data.get("confirm_password")
 
@@ -395,10 +532,10 @@ def update_password(request):
         return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
     user.set_password(new_password)
-    user.is_active = True  # ✅ Activate user only after password update
+    user.is_active = True  #  Activate user only after password update
     user.save()
 
-    # ✅ Update last login timestamp (optional)
+    #  Update last login timestamp (optional)
     update_last_login(None, user)
 
     return Response({"message": "Password reset successful, user is now active"}, status=status.HTTP_200_OK)
@@ -436,19 +573,19 @@ class BulkUserCreateView(APIView):
                             return Response({"error": f"Invalid role: {row['role']}"}, 
                                             status=status.HTTP_400_BAD_REQUEST)
 
-                        # ✅ Create the user instance
+                        #  Create the user instance
                         user = User(
-                        name=row['username'],  # ✅ Use 'name' instead of 'username'
+                        name=row['username'],  #  Use 'name' instead of 'username'
                         email=row['email'],
                         password=make_password(row['password']),
                         role=role_instance  
                         )
                         # user.username = row['username']
                         # user.email = row['email']
-                        # user.password = make_password(row['password'])  # ✅ Hash password
-                        # user.role = role_instance  # ✅ Assign ForeignKey properly
+                        # user.password = make_password(row['password'])  #  Hash password
+                        # user.role = role_instance  #  Assign ForeignKey properly
 
-                        user.save()  # ✅ Save the user instance correctly
+                        user.save()  #  Save the user instance correctly
                         users_created += 1
 
                 return Response({"message": f"{users_created} users created successfully."}, 
@@ -459,3 +596,30 @@ class BulkUserCreateView(APIView):
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
+
+
+
+from django.core.cache import cache
+from django.http import JsonResponse
+
+def my_cached_view(request):
+    # Check if data exists in cache
+    cached_data = cache.get("my_data")
+    print(cache.get("my_data"))  # Should print the cached value if not expired
+
+    if cached_data:
+        return JsonResponse({"message": "hyyy everyone!", "data": cached_data})
+
+    # If not cached, fetch or compute data (simulating a database query)
+    new_data = {"name": "Elsy", "age": 22,"place":"chennai"}
+
+    # Store data in cache for 60 seconds
+    cache.set("my_data", new_data, timeout=30)
+
+    return JsonResponse({"message": "Cache miss! Data stored.", "data": new_data})
+
+
+
+
+# print(cache.get("my_data"))  # Should print the cached value if not expired

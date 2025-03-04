@@ -16,6 +16,7 @@ from .views import (
     update_password,
     role_crud,
     BulkUserCreateView,
+    my_cached_view,
 )
 
 urlpatterns = [
@@ -24,7 +25,8 @@ urlpatterns = [
     path("verify-email/<str:token>/", VerifyEmailView.as_view(), name="verify-email"),
     path('login/', login, name='login'),
     path('bulk-user-upload/', BulkUserCreateView.as_view(), name='bulk-user-upload'),
-
+    path('my-cached-view/', my_cached_view, name='my-cached-view'),
+     path('user-list/<int:user_id>/', user_list, name='user-detail'),
 
     # path("login/", LoginView.as_view(template_name="login.html"), name="login"),
     
@@ -52,3 +54,7 @@ if settings.DEBUG:
 
 
 
+# from django.urls import path
+# from .views import my_cached_view  # Import your view
+
+#     path('my-cached-view/', my_cached_view, name='my-cached-view'),

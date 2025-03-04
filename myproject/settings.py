@@ -149,7 +149,17 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle'
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '1000/day',  # Limits anonymous users to 5 requests per minute
+        'user': '100/minute'  # Limits authenticated users to 10 requests per minute
+    }
 }
+
+
 
 FRONTEND_URL = "https://yourfrontend.com"
 
@@ -159,8 +169,8 @@ AUTH_USER_MODEL = 'myapp.Student'  # Ensure this is correctly set
 from datetime import timedelta
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(hours=12),  # Increase access token lifetime
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),   # Increase refresh token lifetime
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=7),  # Increase access token lifetime
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=30),   # Increase refresh token lifetime
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "ALGORITHM": "HS256",
@@ -175,5 +185,18 @@ SIMPLE_JWT = {
 from django.conf import settings
 
 SIMPLE_JWT = {
-    "SIGNING_KEY": settings.SECRET_KEY,  # ✅ Use settings.SECRET_KEY only outside settings.py
+    "SIGNING_KEY": settings.SECRET_KEY,  #  Use settings.SECRET_KEY only outside settings.py
+}
+
+
+
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/1",  # Redis server address
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
 }
