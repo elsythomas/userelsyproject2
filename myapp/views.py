@@ -179,6 +179,40 @@ from rest_framework import status
 
 from .permissions import IsAdminOrTeacher ,IsAdmin # Ensure this is imported
 
+from openpyxl import load_workbook
+import os
+import pandas as pd
+
+EXCEL_FILE = "C:\\Users\\Elsy Thomas\\Downloads\\users.xlsx"
+
+def update_google_sheet(user):
+    """
+    Updates the Excel sheet with a new user entry.
+    """
+    # Check if the file exists
+    if not os.path.exists(EXCEL_FILE):
+        df = pd.DataFrame(columns=["ID", "Name", "Email", "Role", "Status"])
+        df.to_excel(EXCEL_FILE, index=False)
+
+    # Load the existing Excel file
+    df = pd.read_excel(EXCEL_FILE)
+
+    # Append new user data
+    new_data = pd.DataFrame([{
+        "ID": user.id,
+        "Name": user.name,
+        "Email": user.email,
+        "Role": user.role.name if user.role else "No Role",
+        "Status": "Pending"
+    }])
+
+    df = pd.concat([df, new_data], ignore_index=True)
+
+    # Save back to Excel
+    df.to_excel(EXCEL_FILE, index=False)
+
+
+
 
 from django.core.cache import cache
 from django.core.mail import EmailMessage
@@ -186,17 +220,18 @@ from django.conf import settings
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
-from django.contrib.auth import get_user_model
-from .models import Role, Student
+from .models import Student, Role
 from .permissions import IsAdminOrTeacher
+from .utils import update_google_sheet, update_user_status_in_google_sheet
 import redis
 
-User = get_user_model()
-redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)  # Connect to Redis
+redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
+
+# Initialize Excel when the app starts
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated, IsAdminOrTeacher])
+@permission_classes([IsAdminOrTeacher])
 def create_user(request):
     print(f"User: {request.user}, Role: {getattr(request.user.role, 'name', 'No Role')}")
 
@@ -212,33 +247,33 @@ def create_user(request):
     if not email or not name or not password:
         return Response({'error': 'Name, email, and password are required'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # 🛑 Check if user creation is rate-limited in Redis (Avoid spamming user creation)
-    rate_limit_key = f"user_creation:{request.user.id}"
-    if redis_client.exists(rate_limit_key):
-        return Response({'error': 'Too many requests. Try again later.'}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+    # #  Rate-limit user creation (prevent spam)
+    # rate_limit_key = f"user_creation:{request.user.id}"
+    # if redis_client.exists(rate_limit_key):
+    #     return Response({'error': 'Too many requests. Try again later.'}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+    # redis_client.setex(rate_limit_key, 60, 1)  # Allow one request per minute
 
-    redis_client.setex(rate_limit_key, 60, 1)  # Allow one request per minute
-
-    # ✅ Use Redis cache to store roles (reduce database queries)
+    # ✅ Cache role for efficiency
     cache_key = f"role_{role_id}"
     role = cache.get(cache_key)
-
     if not role:
         role = Role.objects.filter(id=role_id).first()
         if not role:
             return Response({'error': 'Invalid role ID'}, status=status.HTTP_400_BAD_REQUEST)
-        cache.set(cache_key, role, timeout=300)  # Cache role for 5 minutes
+        cache.set(cache_key, role,)
 
-    #  ✅ Create user with "Pending" status
+    # ✅ Create a new user with "Pending" status
     user = Student.objects.create_user(email=email, password=password, name=name, role=role)
-    user.is_active = False  # Deactivate initially
+    user.is_active = False  # User is inactive initially
     user.save()
 
-    # ✅ Store password reset URL in Redis (cache for security)
-    reset_url = f"https://your-website.com/reset-password/{user.id}"
-    redis_client.setex(f"reset_url:{user.id}", 600, reset_url)  # Store URL for 10 minutes
+    # ✅ Update Excel after user creation
+    update_google_sheet(user)
 
-    # ✅ Send Email
+    # ✅ Send Password Reset Email
+    reset_url = f"https://your-website.com/reset-password/{user.id}"
+    redis_client.setex(f"reset_url:{user.id}",5, reset_url)
+
     subject = "Welcome! Please Reset Your Password"
     html_message = f"""
     <html>
@@ -265,6 +300,95 @@ def create_user(request):
     email_message.send(fail_silently=False)
 
     return Response({'message': 'User created. Please reset your password to activate the account.', 'id': user.id}, status=status.HTTP_201_CREATED)
+
+# from django.core.cache import cache
+# from django.core.mail import EmailMessage
+# from django.conf import settings
+# from rest_framework.decorators import api_view, permission_classes
+# from rest_framework.response import Response
+# from rest_framework import status
+# from django.contrib.auth import get_user_model
+# from .models import Role, Student
+# from .permissions import IsAdminOrTeacher
+# import redis
+
+# User = get_user_model()
+# redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)  # Connect to Redis
+
+
+# @api_view(['POST'])
+# @permission_classes([IsAuthenticated, IsAdminOrTeacher])
+# def create_user(request):
+#     print(f"User: {request.user}, Role: {getattr(request.user.role, 'name', 'No Role')}")
+
+#     if not request.user.is_authenticated:
+#         return Response({"error": "Authentication required"}, status=401)
+
+#     data = request.data
+#     name = data.get('username')  
+#     email = data.get('email')
+#     password = data.get('password')
+#     role_id = data.get('role_id')
+
+#     if not email or not name or not password:
+#         return Response({'error': 'Name, email, and password are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+#     # 🛑 Check if user creation is rate-limited in Redis (Avoid spamming user creation)
+#     rate_limit_key = f"user_creation:{request.user.id}"
+#     if redis_client.exists(rate_limit_key):
+#         return Response({'error': 'Too many requests. Try again later.'}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+
+#     redis_client.setex(rate_limit_key, 60, 1)  # Allow one request per minute
+
+#     # ✅ Use Redis cache to store roles (reduce database queries)
+#     cache_key = f"role_{role_id}"
+#     role = cache.get(cache_key)
+
+#     if not role:
+#         role = Role.objects.filter(id=role_id).first()
+#         if not role:
+#             return Response({'error': 'Invalid role ID'}, status=status.HTTP_400_BAD_REQUEST)
+#         cache.set(cache_key, role, timeout=300)  # Cache role for 5 minutes
+
+#     #  ✅ Create user with "Pending" status
+#     user = Student.objects.create_user(email=email, password=password, name=name, role=role)
+#     user.is_active = False  # Deactivate initially
+#     user.save()
+#     update_excel(user)
+
+#     # ✅ Store password reset URL in Redis (cache for security)
+#     reset_url = f"https://your-website.com/reset-password/{user.id}"
+#     redis_client.setex(f"reset_url:{user.id}", 600, reset_url)  # Store URL for 10 minutes
+
+#     # ✅ Send Email
+#     subject = "Welcome! Please Reset Your Password"
+#     html_message = f"""
+#     <html>
+#     <body>
+#         <h2>Hi {name}, welcome to our platform!</h2>
+#         <p>Your account has been created successfully, but you need to reset your password before activation.</p>
+#         <p>Click the button below to set your new password:</p>
+#         <a href="{reset_url}" style="display: inline-block; padding: 10px 20px; font-size: 16px; 
+#         color: white; background-color: #007bff; text-decoration: none; border-radius: 5px;">
+#             Reset Password
+#         </a>
+#         <p>After resetting, your account will be activated.</p>
+#     </body>
+#     </html>
+#     """
+
+#     email_message = EmailMessage(
+#         subject,
+#         html_message,
+#         settings.DEFAULT_FROM_EMAIL,
+#         [email]
+#     )
+#     email_message.content_subtype = "html"
+#     email_message.send(fail_silently=False)
+
+#     return Response({'message': 'User created. Please reset your password to activate the account.', 'id': user.id}, status=status.HTTP_201_CREATED)
+
+
 
 # @api_view(['POST'])
 # @permission_classes([IsAuthenticated, IsAdminOrTeacher])
@@ -537,6 +661,7 @@ def update_password(request):
 
     #  Update last login timestamp (optional)
     update_last_login(None, user)
+    update_user_status_in_google_sheet(user.email, "Active")
 
     return Response({"message": "Password reset successful, user is now active"}, status=status.HTTP_200_OK)
 

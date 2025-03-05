@@ -19,7 +19,7 @@ class ResetPasswordSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         instance.password = make_password(validated_data["password"])
-        instance.is_active = True  # ✅ Activate user after reset
+        instance.is_active = True  #  Activate user after reset
         instance.save()
         return instance
 
@@ -41,7 +41,7 @@ class BulkUserCreateSerializer(serializers.Serializer):
 
     def validate_file(self, value):
         """Ensure the uploaded file is an Excel file."""
-        print(f"Received file: {value.name}")  # ✅ Debugging
+        print(f"Received file: {value.name}")  #  Debugging
         print(f"File Name: {value.name}")
         if not value.name.endswith(('.xls', '.xlsx')):
             raise serializers.ValidationError("Only Excel files are allowed.")
