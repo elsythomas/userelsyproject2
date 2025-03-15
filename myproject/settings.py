@@ -12,12 +12,10 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-lvq*1yyh1d&w@9c-m-#i6faaa(^b4t#d))x1$g0ih^3#r1i&#g'
@@ -31,6 +29,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'rest_framework',
     'rest_framework.authtoken',
     'rest_framework_simplejwt',
@@ -41,6 +40,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'myapp',
+    'channels',
+    
 ]
 
 MIDDLEWARE = [
@@ -95,8 +96,7 @@ DATABASES = {
 
 
 
-# Password validation
-# https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
+
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -165,8 +165,13 @@ FRONTEND_URL = "https://yourfrontend.com"
 
 AUTH_USER_MODEL = 'myapp.Student'  # Ensure this is correctly set
 
+# CSRF_TRUSTED_ORIGINS = [
+#     "http://localhost:8000",  # Add if running locally
+#     "https://yourfrontend.com"  # Add your actual frontend domain
+# ]
 
 from datetime import timedelta
+from django.conf import settings
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(days=7),  # Increase access token lifetime
@@ -182,11 +187,11 @@ SIMPLE_JWT = {
 }
 
 
-from django.conf import settings
+# from django.conf import settings
 
-SIMPLE_JWT = {
-    "SIGNING_KEY": settings.SECRET_KEY,  #  Use settings.SECRET_KEY only outside settings.py
-}
+# SIMPLE_JWT = {
+#     "SIGNING_KEY": settings.SECRET_KEY,  #  Use settings.SECRET_KEY only outside settings.py
+# }
 
 
 
@@ -199,4 +204,50 @@ CACHES = {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         }
     }
+}
+
+
+from .logging_config import LOGGING_CONFIG
+
+LOGGING = LOGGING_CONFIG  # Use the imported logging configuration
+
+
+LOGGING_CONFIG = None  # Disable default logging config
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'django_debug.log',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['file'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+    },
+}
+
+
+
+
+
+ASGI_APPLICATION = "myproject.asgi.application"
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    },
 }

@@ -56,9 +56,9 @@ def update_google_sheet(user):
         new_row = [user.id, user.name, user.email, user.role.name if user.role else "No Role", "Pending"]
         sheet.append_row(new_row)
 
-        print("✅ Google Sheet updated successfully!")
+        print(" Google Sheet updated successfully!")
     except Exception as e:
-        print(f"❌ Error updating Google Sheets: {e}")
+        print(f" Error updating Google Sheets: {e}")
 
 
 import gspread
@@ -89,9 +89,9 @@ def update_user_status_in_google_sheet(email, new_status):
         for i, row in enumerate(data, start=2):  # Start from row 2 (after headers)
             if row["Email"] == email:
                 sheet.update_cell(i, 5, new_status)  # Assuming "Status" is in column 5
-                print(f"✅ Updated {email}'s status to {new_status} in Google Sheets.")
+                print(f" Updated {email}'s status to {new_status} in Google Sheets.")
                 return
 
         print(f"⚠️ Email {email} not found in Google Sheets.")
     except Exception as e:
-        print(f"❌ Error updating Google Sheets: {e}")
+        print(f" Error updating Google Sheets: {e}")
